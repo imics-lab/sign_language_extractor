@@ -155,3 +155,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# This script is designed to be run from the command line.
+# Example usage:
+# To load only hand data, pad/truncate to 100 frames, and save:
+# python create_npy_dataset.py \
+#     --input_dir ./landmark_data \
+#     --output_file ./datasets/hands_only_len100.npy \
+#     --landmarks LeftHand RightHand \
+#     --max_len 100
