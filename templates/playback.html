@@ -18,6 +18,7 @@
         }
         #controls button { margin-right: 10px; padding: 5px 10px; }
         #playbackStatus, #frameIndicator { margin-top: 10px; font-style: italic; }
+        .info-box { background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #2196f3; }
     </style>
     <!-- Load MediaPipe Drawing Utils and Holistic -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js" crossorigin="anonymous"></script>
@@ -27,6 +28,17 @@
     <div class="container">
         <h1>Landmark Data Playback</h1>
          <p><a href="/">Back to Capture</a></p> <!-- Link back to the main page -->
+
+        <div class="info-box">
+            <h3>📍 Landmark Visualization</h3>
+            <p>This playback tool visualizes pose, face, and hand landmarks from your captured data:</p>
+            <ul>
+                <li><strong>Pose landmarks:</strong> Blue connections and points</li>
+                <li><strong>Face landmarks:</strong> Light pink connections and points (468 facial feature points)</li>
+                <li><strong>Hand landmarks:</strong> Left hand (orange), Right hand (cyan)</li>
+            </ul>
+            <p>Files with 1629 features include all landmarks. Files with 225 features include pose and hands only.</p>
+        </div>
 
         <div class="section">
             <h2>Load Landmark Data</h2>
