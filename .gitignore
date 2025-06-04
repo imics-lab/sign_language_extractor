@@ -176,3 +176,7 @@ cython_debug/
 # Application cache
 uploads/
 data/
+temp_test/
+
+# Cursor specific
+.cursor/
