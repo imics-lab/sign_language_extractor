@@ -304,15 +304,8 @@ class SignLanguageFeatureExtractor:
                 # Scale by shoulder width (now safe since we handled zero case)
                 body_relative_pose[i] /= shoulder_width
             else:
-                # Only set to NaN if truly missing (visibility score < threshold)
-                # For web interface data without visibility scores, keep all landmarks
-                if pose_visibility is not None:
-                    body_relative_pose[i] = np.array([np.nan, np.nan, np.nan])
-                else:
-                    # No visibility data - treat all landmarks as valid (including zeros)
-                    relative_pos = pose[i] - body_center
-                    body_relative_pose[i] = R.T @ relative_pos
-                    body_relative_pose[i] /= shoulder_width
+                # Set missing landmarks to zero instead of NaN to prevent training issues
+                body_relative_pose[i] = np.array([0.0, 0.0, 0.0])
         
         # Store transformation parameters
         transform = {
@@ -374,7 +367,8 @@ class SignLanguageFeatureExtractor:
                 angles.append(angle)
                 angle_names.append(name)
             else:
-                angles.append(np.nan)  # Missing angle
+                # Use zero instead of NaN for missing angles
+                angles.append(0.0)
                 angle_names.append(name + '_missing')
                 
         return angles
@@ -396,7 +390,8 @@ class SignLanguageFeatureExtractor:
                 length = np.linalg.norm(pose[end] - pose[start]) / reference_scale
                 lengths.append(length)
             else:
-                lengths.append(np.nan)  # Missing length
+                # Use zero instead of NaN for missing lengths
+                lengths.append(0.0)
                 
         return lengths
     
@@ -419,10 +414,10 @@ class SignLanguageFeatureExtractor:
         # Reverse the transformation
         original_pose = np.zeros_like(normalized_pose)
         for i in range(len(normalized_pose)):
-            # Check for NaN values (truly missing landmarks)
-            if np.any(np.isnan(normalized_pose[i])):
-                # Keep NaN for missing landmarks (though this should be rare now)
-                original_pose[i] = np.array([np.nan, np.nan, np.nan])
+            # Check for zero values (missing landmarks) instead of NaN
+            if np.allclose(normalized_pose[i], 0.0):
+                # Keep zero for missing landmarks
+                original_pose[i] = np.array([0.0, 0.0, 0.0])
             else:
                 # Undo scaling
                 scaled_pos = normalized_pose[i] * scale

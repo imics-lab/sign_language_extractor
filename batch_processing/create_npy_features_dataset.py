@@ -135,7 +135,7 @@ def extract_metadata_features(metadata: Dict) -> Optional[np.ndarray]:
 
 # Feature type mapping
 FEATURE_EXTRACTORS = {
-    "Pose": extract_pose_features,
+    "Pose": lambda f: extract_pose_features(f.get('body', {})),
     "LeftHand": lambda f: extract_hand_features(f.get('left_hand', {})),
     "RightHand": lambda f: extract_hand_features(f.get('right_hand', {})),
     "Face": lambda f: extract_face_features(f.get('face', {})),
