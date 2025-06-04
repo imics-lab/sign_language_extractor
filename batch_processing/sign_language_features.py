@@ -570,21 +570,32 @@ class SignLanguageFeatureExtractor:
         left_corner = mouth_landmarks[2]    # Index 61: left corner
         right_corner = mouth_landmarks[3]   # Index 291: right corner
         
-        # Mouth openness (vertical distance between lips)
-        mouth_height = np.linalg.norm(upper_lip - lower_lip) / face_scale
-        
-        # Mouth width (horizontal distance between corners)
-        mouth_width = np.linalg.norm(right_corner - left_corner) / face_scale
-        
-        # Mouth center relative to nose
-        mouth_center = (upper_lip + lower_lip) / 2
-        mouth_to_nose = (mouth_center - nose_pos) / face_scale
+        # Protect against division by zero when face_scale is 0
+        if face_scale > 1e-6:
+            # Mouth openness (vertical distance between lips)
+            mouth_height = np.linalg.norm(upper_lip - lower_lip) / face_scale
+            
+            # Mouth width (horizontal distance between corners)
+            mouth_width = np.linalg.norm(right_corner - left_corner) / face_scale
+            
+            # Mouth center relative to nose
+            mouth_center = (upper_lip + lower_lip) / 2
+            mouth_to_nose = (mouth_center - nose_pos) / face_scale
+            
+            mouth_relative_x = mouth_to_nose[0]
+            mouth_relative_y = mouth_to_nose[1]
+        else:
+            # Use default values when face_scale is zero or very small
+            mouth_height = 0.0
+            mouth_width = 0.0
+            mouth_relative_x = 0.0
+            mouth_relative_y = 0.0
         
         features.update({
             'mouth_openness': mouth_height,
             'mouth_width': mouth_width,
-            'mouth_relative_x': mouth_to_nose[0],
-            'mouth_relative_y': mouth_to_nose[1]
+            'mouth_relative_x': mouth_relative_x,
+            'mouth_relative_y': mouth_relative_y
         })
         
         # Eyebrow analysis (next 6 landmarks)
@@ -592,13 +603,18 @@ class SignLanguageFeatureExtractor:
         left_peak = eyebrow_landmarks[2]    # Index 105: left eyebrow peak
         right_peak = eyebrow_landmarks[5]   # Index 334: right eyebrow peak
         
-        # Average eyebrow height relative to nose
-        left_height = (left_peak[1] - nose_pos[1]) / face_scale
-        right_height = (right_peak[1] - nose_pos[1]) / face_scale
-        avg_eyebrow_height = (left_height + right_height) / 2
-        
-        # Eyebrow asymmetry
-        eyebrow_asymmetry = abs(left_height - right_height)
+        if face_scale > 1e-6:
+            # Average eyebrow height relative to nose
+            left_height = (left_peak[1] - nose_pos[1]) / face_scale
+            right_height = (right_peak[1] - nose_pos[1]) / face_scale
+            avg_eyebrow_height = (left_height + right_height) / 2
+            
+            # Eyebrow asymmetry
+            eyebrow_asymmetry = abs(left_height - right_height)
+        else:
+            # Use default values when face_scale is zero or very small
+            avg_eyebrow_height = 0.0
+            eyebrow_asymmetry = 0.0
         
         features.update({
             'eyebrow_raise': avg_eyebrow_height,
@@ -612,13 +628,18 @@ class SignLanguageFeatureExtractor:
         right_upper = eye_landmarks[6]      # Index 386: right eye upper lid
         right_lower = eye_landmarks[7]      # Index 374: right eye lower lid
         
-        # Eye openness
-        left_eye_openness = np.linalg.norm(left_upper - left_lower) / face_scale
-        right_eye_openness = np.linalg.norm(right_upper - right_lower) / face_scale
-        avg_eye_openness = (left_eye_openness + right_eye_openness) / 2
-        
-        # Eye asymmetry
-        eye_asymmetry = abs(left_eye_openness - right_eye_openness)
+        if face_scale > 1e-6:
+            # Eye openness
+            left_eye_openness = np.linalg.norm(left_upper - left_lower) / face_scale
+            right_eye_openness = np.linalg.norm(right_upper - right_lower) / face_scale
+            avg_eye_openness = (left_eye_openness + right_eye_openness) / 2
+            
+            # Eye asymmetry
+            eye_asymmetry = abs(left_eye_openness - right_eye_openness)
+        else:
+            # Use default values when face_scale is zero or very small
+            avg_eye_openness = 0.0
+            eye_asymmetry = 0.0
         
         features.update({
             'eye_openness': avg_eye_openness,
@@ -875,7 +896,10 @@ class SignLanguageFeatureExtractor:
                               pose: np.ndarray) -> float:
         """Calculate normalized distance from hand to face."""
         shoulder_width = np.linalg.norm(pose[self.RIGHT_SHOULDER] - pose[self.LEFT_SHOULDER])
-        distance = np.linalg.norm(hand_pos - face_pos) / shoulder_width
+        if shoulder_width > 1e-6:
+            distance = np.linalg.norm(hand_pos - face_pos) / shoulder_width
+        else:
+            distance = 0.0  # Default value when shoulder width is zero
         return distance
     
     def _hand_to_chest_position(self, hand_pos: np.ndarray, pose: np.ndarray) -> List[float]:
@@ -883,13 +907,21 @@ class SignLanguageFeatureExtractor:
         chest_center = (pose[self.LEFT_SHOULDER] + pose[self.RIGHT_SHOULDER]) / 2
         relative_pos = hand_pos - chest_center
         shoulder_width = np.linalg.norm(pose[self.RIGHT_SHOULDER] - pose[self.LEFT_SHOULDER])
-        return (relative_pos / shoulder_width).tolist()
+        if shoulder_width > 1e-6:
+            normalized_pos = (relative_pos / shoulder_width).tolist()
+        else:
+            normalized_pos = [0.0, 0.0, 0.0]  # Default values when shoulder width is zero
+        return normalized_pos
     
     def _normalized_distance(self, pos1: np.ndarray, pos2: np.ndarray, 
                            pose: np.ndarray) -> float:
         """Calculate normalized distance between two positions."""
         shoulder_width = np.linalg.norm(pose[self.RIGHT_SHOULDER] - pose[self.LEFT_SHOULDER])
-        return np.linalg.norm(pos1 - pos2) / shoulder_width
+        if shoulder_width > 1e-6:
+            distance = np.linalg.norm(pos1 - pos2) / shoulder_width
+        else:
+            distance = 0.0  # Default value when shoulder width is zero
+        return distance
     
     def _hands_relative_position(self, pose: np.ndarray) -> List[float]:
         """Calculate relative position of hands."""
@@ -903,7 +935,11 @@ class SignLanguageFeatureExtractor:
         
         shoulder_width = np.linalg.norm(pose[self.RIGHT_SHOULDER] - pose[self.LEFT_SHOULDER])
         
-        return np.concatenate([left_rel / shoulder_width, right_rel / shoulder_width]).tolist()
+        if shoulder_width > 1e-6:
+            normalized_result = np.concatenate([left_rel / shoulder_width, right_rel / shoulder_width]).tolist()
+        else:
+            normalized_result = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # Default values when shoulder width is zero
+        return normalized_result
 
 
 # Example usage and validation

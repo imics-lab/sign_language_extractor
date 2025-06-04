@@ -1,17 +1,19 @@
 # Complete Feature Documentation: Compact Mode
 ## Pose + LeftHand + RightHand + CompactFace + Relationships + Metadata
 
-This document provides detailed information about **all ~391 features** extracted when using the complete Compact Mode pipeline for sign language recognition. This documentation facilitates **geometry-aware data augmentations** that respect human anatomy, biomechanics, and sign language linguistics.
+This document provides detailed information about **all ~392 features** extracted when using the complete Compact Mode pipeline for sign language recognition. This documentation facilitates **geometry-aware data augmentations** that respect human anatomy, biomechanics, and sign language linguistics.
 
 ## Overview
 
-**Total Features**: ~391
+**Total Features**: ~392
 - **Pose**: 107 features (body landmarks, joint angles, limb lengths)
 - **LeftHand**: 90 features (hand landmarks, finger angles, distances, shape)
 - **RightHand**: 90 features (same structure as left hand)
 - **CompactFace**: 92 features (key facial landmarks + semantic features)
-- **Relationships**: 6 features (spatial relationships between body parts)
+- **Relationships**: 7 features (spatial relationships between body parts)*
 - **Metadata**: 6 features (completeness flags and quality scores)
+
+*Note: Relationship features can vary from 1-15 depending on which body parts are detected. In practice, ~7 features are typically extracted.
 
 **Coordinate Systems**: All landmarks normalized relative to appropriate reference frames (body center, wrist, nose) and scaled by anatomical reference measurements.
 
@@ -220,37 +222,43 @@ This document provides detailed information about **all ~391 features** extracte
 
 ---
 
-## FEATURE GROUP 5: RELATIONSHIP FEATURES (Features 379-384)
-### Total: 6 features
+## FEATURE GROUP 5: RELATIONSHIP FEATURES (Features 379-385)
+### Total: 7 features (variable 1-15)
 
 **Spatial relationships between major body parts**
 
-| Feature Index | Relationship | Description | Units |
-|---------------|--------------|-------------|-------|
-| 379 | Left Hand to Face | Distance from left wrist to nose | Normalized |
-| 380 | Right Hand to Face | Distance from right wrist to nose | Normalized |
-| 381 | Left Hand to Chest | Relative position of left hand to torso | X,Y,Z vector |
-| 382 | Right Hand to Chest | Relative position of right hand to torso | X,Y,Z vector |
-| 383 | Hands Distance | Distance between left and right wrists | Normalized |
-| 384 | Hands Relative Position | Spatial relationship between hands | Vector |
+The relationship features depend on which body parts are successfully detected. The theoretical maximum is 15 features, but in practice ~7 features are typically extracted due to missing landmarks or detection failures.
 
-**Note**: Some relationship features may be multi-dimensional, actual count varies (1-8 features total)
+**Possible Relationship Features:**
+
+| Feature | Description | Count | Condition |
+|---------|-------------|-------|-----------|
+| Left Hand to Face | Distance from left wrist to nose | 1 | If left hand and face detected |
+| Right Hand to Face | Distance from right wrist to nose | 1 | If right hand and face detected |
+| Left Hand to Chest | Relative position of left hand to torso | 3 | If left hand and shoulders detected |
+| Right Hand to Chest | Relative position of right hand to torso | 3 | If right hand and shoulders detected |
+| Hands Distance | Distance between left and right wrists | 1 | If both hands detected |
+| Hands Relative Position | Spatial relationship between hands | 6 | If both hands detected |
+
+**Total Maximum**: 1 + 1 + 3 + 3 + 1 + 6 = 15 features
+
+**Typical Practice**: ~7 features (varies based on landmark detection success)
 
 ---
 
-## FEATURE GROUP 6: METADATA FEATURES (Features 385-390)
+## FEATURE GROUP 6: METADATA FEATURES (Features 386-391)
 ### Total: 6 features
 
 **Data quality and completeness indicators**
 
 | Feature Index | Metadata | Description | Range |
 |---------------|----------|-------------|-------|
-| 385 | Pose Complete | Whether full pose was detected | 0.0-1.0 |
-| 386 | Left Hand Complete | Whether left hand was detected | 0.0-1.0 |
-| 387 | Right Hand Complete | Whether right hand was detected | 0.0-1.0 |
-| 388 | Face Complete | Whether face was detected | 0.0-1.0 |
-| 389 | Has Full Torso | Whether full torso is visible | 0.0-1.0 |
-| 390 | Completeness Score | Overall data quality score | 0.0-1.0 |
+| 386 | Pose Complete | Whether full pose was detected | 0.0-1.0 |
+| 387 | Left Hand Complete | Whether left hand was detected | 0.0-1.0 |
+| 388 | Right Hand Complete | Whether right hand was detected | 0.0-1.0 |
+| 389 | Face Complete | Whether face was detected | 0.0-1.0 |
+| 390 | Has Full Torso | Whether full torso is visible | 0.0-1.0 |
+| 391 | Completeness Score | Overall data quality score | 0.0-1.0 |
 
 ---
 

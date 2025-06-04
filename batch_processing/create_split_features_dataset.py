@@ -18,6 +18,87 @@ from typing import Dict, List, Optional
 # Import feature extraction functions from the other script
 from create_npy_features_dataset import FEATURE_EXTRACTORS, determine_feature_size
 
+def check_for_nans_and_infs(array, context_info="", video_id="", frame_idx=None):
+    """
+    Check for NaN and Inf values in an array and raise detailed error if found.
+    
+    Args:
+        array: numpy array to check
+        context_info: descriptive context for where this check is happening
+        video_id: video ID being processed (for error reporting)
+        frame_idx: frame index being processed (for error reporting)
+    """
+    if not isinstance(array, np.ndarray):
+        array = np.array(array)
+    
+    nan_count = np.isnan(array).sum()
+    inf_count = np.isinf(array).sum()
+    
+    if nan_count > 0 or inf_count > 0:
+        error_msg = f"❌ CRITICAL ERROR: Invalid values detected in {context_info}"
+        if video_id:
+            error_msg += f" for video '{video_id}'"
+        if frame_idx is not None:
+            error_msg += f" at frame {frame_idx}"
+        error_msg += f"\n  NaN count: {nan_count}"
+        error_msg += f"\n  Inf count: {inf_count}"
+        error_msg += f"\n  Array shape: {array.shape}"
+        error_msg += f"\n  Array dtype: {array.dtype}"
+        
+        if nan_count > 0:
+            nan_indices = np.where(np.isnan(array))
+            if len(nan_indices[0]) > 0:
+                error_msg += f"\n  First few NaN positions: {list(zip(*[idx[:5] for idx in nan_indices]))}"
+        
+        if inf_count > 0:
+            inf_indices = np.where(np.isinf(array))
+            if len(inf_indices[0]) > 0:
+                error_msg += f"\n  First few Inf positions: {list(zip(*[idx[:5] for idx in inf_indices]))}"
+        
+        error_msg += "\n\n🛑 This indicates a bug in the feature extraction pipeline!"
+        error_msg += "\n   Please check the sign_language_features.py for division by zero or invalid operations."
+        
+        raise ValueError(error_msg)
+
+def validate_final_dataset(X, y, subset_name):
+    """
+    Perform final validation on the complete dataset before saving.
+    
+    Args:
+        X: Feature array
+        y: Label array  
+        subset_name: Name of the subset (train/val/test)
+    """
+    print(f"\n🔍 Final validation for {subset_name} set...")
+    
+    # Check X array
+    check_for_nans_and_infs(X, f"{subset_name} feature array (X)")
+    
+    # Check y array 
+    check_for_nans_and_infs(y, f"{subset_name} label array (y)")
+    
+    # Additional sanity checks
+    if X.shape[0] != y.shape[0]:
+        raise ValueError(f"Mismatch: X has {X.shape[0]} samples but y has {y.shape[0]} samples")
+    
+    if len(X.shape) != 3:
+        raise ValueError(f"Expected X to be 3D (samples, time, features), got shape {X.shape}")
+    
+    if len(y.shape) != 1:
+        raise ValueError(f"Expected y to be 1D (samples,), got shape {y.shape}")
+    
+    # Check for reasonable value ranges
+    finite_X = X[np.isfinite(X)]
+    if len(finite_X) > 0:
+        x_min, x_max = finite_X.min(), finite_X.max()
+        x_mean, x_std = finite_X.mean(), finite_X.std()
+        print(f"  ✅ X statistics: min={x_min:.4f}, max={x_max:.4f}, mean={x_mean:.4f}, std={x_std:.4f}")
+    
+    y_min, y_max = y.min(), y.max()
+    print(f"  ✅ y statistics: min={y_min}, max={y_max}, unique_labels={len(np.unique(y))}")
+    
+    print(f"  ✅ {subset_name} set validation passed!")
+
 def main():
     parser = argparse.ArgumentParser(
         description="Load feature JSON files based on metadata, select features, "
@@ -63,6 +144,7 @@ def main():
 
     print(f"\nSelected features: {selected_features}")
     print(f"Target sequence length: {max_len}")
+    print("🔍 NaN/Inf detection enabled - will abort if invalid values are found!")
 
     # Load metadata
     try:
@@ -153,7 +235,10 @@ def main():
             for frame_idx, frame_features in enumerate(features_segment):
                 if 'error' in frame_features:
                     if args.zero_pad:
-                        frame_vectors.append(np.zeros(feature_size))
+                        zero_frame = np.zeros(feature_size)
+                        # Check that zeros don't contain NaN (they shouldn't, but let's be safe)
+                        check_for_nans_and_infs(zero_frame, "zero-padded frame", video_id, frame_idx)
+                        frame_vectors.append(zero_frame)
                     continue
 
                 # Extract features for this frame
@@ -162,6 +247,8 @@ def main():
                     extractor = FEATURE_EXTRACTORS[feature_type]
                     extracted = extractor(frame_features)
                     if extracted is not None:
+                        # Check extracted features for NaN/Inf before adding
+                        check_for_nans_and_infs(extracted, f"{feature_type} features", video_id, frame_idx)
                         frame_vector.extend(extracted)
                     elif args.zero_pad:
                         # Skip this frame if any feature is missing and not zero-padding
@@ -175,9 +262,14 @@ def main():
                     elif len(frame_vector) > feature_size:
                         frame_vector = frame_vector[:feature_size]
                     
-                    frame_vectors.append(np.array(frame_vector))
+                    frame_array = np.array(frame_vector, dtype=np.float32)
+                    # Check final frame vector for NaN/Inf
+                    check_for_nans_and_infs(frame_array, "final frame vector", video_id, frame_idx)
+                    frame_vectors.append(frame_array)
                 elif args.zero_pad:
-                    frame_vectors.append(np.zeros(feature_size))
+                    zero_frame = np.zeros(feature_size, dtype=np.float32)
+                    check_for_nans_and_infs(zero_frame, "zero-padded frame", video_id, frame_idx)
+                    frame_vectors.append(zero_frame)
 
             if not frame_vectors:
                 print(f"  Warning: Skipping '{video_id}': No valid frames found after feature extraction.")
@@ -186,6 +278,8 @@ def main():
 
             # Convert to numpy array
             sequence_array = np.array(frame_vectors, dtype=np.float32)
+            # Check sequence array for NaN/Inf
+            check_for_nans_and_infs(sequence_array, "sequence array", video_id)
 
             # Pad or truncate sequence length
             num_frames = sequence_array.shape[0]
@@ -199,6 +293,9 @@ def main():
             else:
                 # Pad with zeros (at the end)
                 processed_sequence[:num_frames, :] = sequence_array
+
+            # Final check on processed sequence
+            check_for_nans_and_infs(processed_sequence, "processed sequence", video_id)
 
             # Get label and subset
             label = entry_data["action"][0]  # The first element in 'action' is the class label
@@ -231,8 +328,11 @@ def main():
     # Convert lists to NumPy arrays and save
     for subset_name, subset_data in data_splits.items():
         if subset_data["X"]:
-            X = np.array(subset_data["X"])
-            y = np.array(subset_data["y"])
+            X = np.array(subset_data["X"], dtype=np.float32)
+            y = np.array(subset_data["y"], dtype=np.int64)
+
+            # Perform final validation before saving
+            validate_final_dataset(X, y, subset_name)
 
             X_file = output_path / f"X_{subset_name}.npy"
             y_file = output_path / f"y_{subset_name}.npy"
@@ -244,11 +344,13 @@ def main():
             print(f"  X shape: {X.shape}")
             print(f"  y shape: {y.shape}")
             print(f"  Saved to: {X_file} and {y_file}")
+            print(f"  ✅ No NaN/Inf values detected!")
         else:
             print(f"\n{subset_name.upper()} set: No data")
 
     print(f"\n=== Dataset Creation Complete ===")
     print(f"All files saved to: {output_path.resolve()}")
+    print("✅ All datasets validated successfully - no NaN or Inf values found!")
 
     # Save dataset info
     info = {
@@ -258,6 +360,7 @@ def main():
         'zero_padding_enabled': args.zero_pad,
         'processed_count': processed_count,
         'skipped_count': skipped_count,
+        'validation_passed': True,  # Only reaches here if all validations passed
         'splits': {
             subset: {
                 'num_sequences': len(data["X"]),
